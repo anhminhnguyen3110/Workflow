@@ -3,9 +3,9 @@ import {
   Settings, FileText, Zap, BarChart2, FileCheck,
   Cpu, Hash, GitBranch, Database, Search, Package,
 } from 'lucide-react'
-import { StepInfo, StepStatus } from '../types/run'
+import { StepInfo, StepStatus, PendingApproval } from '../types/run'
 import { formatNodeLabel } from '../types/graph'
-import { langgraphAPI } from '../services/langgraph'
+import { langgraphAPI, lgClient } from '../services/langgraph'
 
 const STEP_COLORS = [
   'var(--cyan)', 'var(--purple)', 'var(--orange)', 'var(--green)',
@@ -59,12 +59,17 @@ export interface WorkflowRunState {
   demoStepIdx: number
   stepRunning: boolean
   isLive: boolean
+  hitlMode: boolean
+  pendingApproval: PendingApproval | null
+  workflowDetailPath: string
   setSelectedStep: (id: string | null) => void
   toggleStepMode: () => void
   runNextStep: () => void
   markRunning: (id: string) => void
   markDone: (id: string, output: unknown, messages: string[]) => void
   markError: (id: string, msg: string) => void
+  approveStep: () => void
+  rejectStep: () => void
 }
 
 export function useWorkflowRun(
@@ -81,15 +86,18 @@ export function useWorkflowRun(
   const [stepMode, setStepMode] = useState(false)
   const [demoStepIdx, setDemoStepIdx] = useState(0)
   const [stepRunning, setStepRunning] = useState(false)
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null)
   const isLiveRef = useRef(false)
+  const hitlModeRef = useRef(false)
   const timerIds = useRef<ReturnType<typeof setTimeout>[]>([])
   const runningNodeTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const loadedStepsRef = useRef<StepInfo[]>([])
 
   useEffect(() => {
-    if (completed) return
+    if (completed || pendingApproval) return
     const t = setInterval(() => setElapsed(e => e + 1), 1000)
     return () => clearInterval(t)
-  }, [completed])
+  }, [completed, pendingApproval])
 
   const clearTimers = useCallback(() => {
     timerIds.current.forEach(clearTimeout)
@@ -143,58 +151,136 @@ export function useWorkflowRun(
     }, lastDelay + 850))
   }, [markRunning, markDone, markError])
 
-  const runLive = useCallback(async (loadedSteps: StepInfo[]): Promise<boolean> => {
-    if (!threadId || !workflowId) return false
-    const input = langgraphAPI.getRunInput(threadId)
-    if (!input) return false
-    try {
-      for await (const { event, data } of langgraphAPI.streamRun(workflowId, threadId, input)) {
-        if (event === 'updates' && data && typeof data === 'object') {
-          const nodeNames = Object.keys(data).filter(k => k !== '__metadata__')
-          for (const name of nodeNames) {
-            const stepExists = loadedSteps.some(s => s.id === name)
-            if (!stepExists) continue
-            markRunning(name)
-            const existing = runningNodeTimers.current.get(name)
-            if (existing) clearTimeout(existing)
-            const tid = setTimeout(() => {
-              const nodeOutput = (data as any)[name]
-              // detect soft-error flag emitted by the node
-              if (nodeOutput?.node_failed) {
-                const errMsg: string = nodeOutput.node_error_message ?? `Node '${name}' failed`
-                markError(name, errMsg)
-                runningNodeTimers.current.delete(name)
-                return
-              }
-              const messages: string[] = []
-              if (nodeOutput?.messages && Array.isArray(nodeOutput.messages)) {
-                const msgs = nodeOutput.messages
-                const last = msgs[msgs.length - 1]
-                if (last?.content) messages.push(String(last.content))
-              }
-              markDone(name, nodeOutput, messages)
+  // Shared: process a stream generator and return whether the thread ended as interrupted
+  const processStreamEvents = useCallback(async (
+    gen: AsyncGenerator<{ event: string; data: any }>,
+    currentSteps: StepInfo[],
+  ): Promise<'completed' | 'interrupted'> => {
+    for await (const { event, data } of gen) {
+      if (event === 'updates' && data && typeof data === 'object') {
+        const nodeNames = Object.keys(data).filter(k => k !== '__metadata__')
+        for (const name of nodeNames) {
+          if (!currentSteps.some(s => s.id === name)) continue
+          markRunning(name)
+          const existing = runningNodeTimers.current.get(name)
+          if (existing) clearTimeout(existing)
+          const tid = setTimeout(() => {
+            const nodeOutput = (data as any)[name]
+            if (nodeOutput?.node_failed) {
+              markError(name, nodeOutput.node_error_message ?? `Node '${name}' failed`)
               runningNodeTimers.current.delete(name)
-            }, 350)
-            runningNodeTimers.current.set(name, tid)
-          }
-        }
-        if (event === 'values' && data && typeof data === 'object') {
-          setGlobalState(data as Record<string, unknown>)
-        }
-        if (event === 'error') {
-          const errName = Object.keys(data ?? {}).find(k => k !== '__metadata__') ?? 'unknown'
-          markError(errName, (data as any)?.message ?? 'Stream error')
-          return true
+              return
+            }
+            const messages: string[] = []
+            if (nodeOutput?.messages && Array.isArray(nodeOutput.messages)) {
+              const msgs = nodeOutput.messages
+              const last = msgs[msgs.length - 1]
+              if (last?.content) messages.push(String(last.content))
+            }
+            markDone(name, nodeOutput, messages)
+            runningNodeTimers.current.delete(name)
+          }, 350)
+          runningNodeTimers.current.set(name, tid)
         }
       }
-      await new Promise(r => setTimeout(r, 400))
+      if (event === 'values' && data && typeof data === 'object') {
+        setGlobalState(data as Record<string, unknown>)
+      }
+      if (event === 'error') {
+        const errName = Object.keys(data ?? {}).find(k => k !== '__metadata__') ?? 'unknown'
+        markError(errName, (data as any)?.message ?? 'Stream error')
+        return 'completed'
+      }
+    }
+    await new Promise(r => setTimeout(r, 400))
+    // Detect if thread was interrupted (HITL pause point)
+    if (threadId) {
+      try {
+        const state = await lgClient.threads.getState(threadId)
+        const nextNodes: string[] = (state as any).next ?? []
+        if (nextNodes.length > 0 && !nextNodes.includes('__end__')) {
+          return 'interrupted'
+        }
+      } catch { /* ignore */ }
+    }
+    return 'completed'
+  }, [threadId, markRunning, markDone, markError])
+
+  const runLive = useCallback(async (loadedSteps: StepInfo[]): Promise<boolean> => {
+    if (!threadId || !workflowId) return false
+    const rawInput = langgraphAPI.getRunInput(threadId)
+    if (!rawInput) return false
+
+    // Extract HITL flag then build clean input
+    const hitlEnabled = !!rawInput.__hitl__
+    hitlModeRef.current = hitlEnabled
+    const input = { ...rawInput }
+    delete input.__hitl__
+
+    const interruptBefore = hitlEnabled
+      ? loadedSteps.map(s => s.id)
+      : []
+
+    try {
+      const result = await processStreamEvents(
+        langgraphAPI.streamRun(workflowId, threadId, input, interruptBefore),
+        loadedSteps,
+      )
+      if (result === 'interrupted') {
+        // Get next node name from thread state
+        try {
+          const state = await lgClient.threads.getState(threadId)
+          const nextNodes: string[] = (state as any).next ?? []
+          const nextNode = nextNodes[0]
+          if (nextNode && nextNode !== '__end__') {
+            setPendingApproval({ nodeId: nextNode })
+            return true
+          }
+        } catch { /* ignore */ }
+      }
       setCompleted(true)
       langgraphAPI.clearRunInput(threadId)
       return true
     } catch {
       return false
     }
-  }, [workflowId, threadId, markRunning, markDone, markError])
+  }, [workflowId, threadId, processStreamEvents])
+
+  const resumeLive = useCallback(async () => {
+    if (!threadId || !workflowId) return
+    const currentSteps = loadedStepsRef.current
+    try {
+      const result = await processStreamEvents(
+        langgraphAPI.resumeRun(workflowId, threadId),
+        currentSteps,
+      )
+      if (result === 'interrupted') {
+        // Another interrupt point
+        try {
+          const state = await lgClient.threads.getState(threadId)
+          const nextNodes: string[] = (state as any).next ?? []
+          const nextNode = nextNodes[0]
+          if (nextNode && nextNode !== '__end__') {
+            setPendingApproval({ nodeId: nextNode })
+            return
+          }
+        } catch { /* ignore */ }
+      }
+      setCompleted(true)
+      langgraphAPI.clearRunInput(threadId)
+    } catch { /* ignore */ }
+  }, [workflowId, threadId, processStreamEvents])
+
+  const approveStep = useCallback(() => {
+    setPendingApproval(null)
+    resumeLive()
+  }, [resumeLive])
+
+  const rejectStep = useCallback(() => {
+    setPendingApproval(null)
+    setError('Run rejected by user at human review checkpoint')
+    setCompleted(true)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -209,6 +295,7 @@ export function useWorkflowRun(
       if (cancelled) return
       setSteps(loadedSteps)
       originalStepsRef.current = loadedSteps
+      loadedStepsRef.current = loadedSteps
 
       const ok = await runLive(loadedSteps)
       if (ok) { isLiveRef.current = true; return }
@@ -266,11 +353,16 @@ export function useWorkflowRun(
     demoStepIdx,
     stepRunning,
     isLive: isLiveRef.current,
+    hitlMode: hitlModeRef.current,
+    pendingApproval,
+    workflowDetailPath: `/workflows/${workflowId ?? ''}`,
     setSelectedStep,
     toggleStepMode,
     runNextStep,
     markRunning,
     markDone,
     markError,
+    approveStep,
+    rejectStep,
   }
 }

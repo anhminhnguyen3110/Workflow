@@ -20,3 +20,7 @@ export interface RunInput {
   priority: string
   [key: string]: unknown
 }
+
+export interface PendingApproval {
+  nodeId: string
+}

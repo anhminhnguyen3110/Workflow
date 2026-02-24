@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { ArrowLeft, Clock, SkipForward, Play } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ArrowLeft, Clock, SkipForward, Play, ShieldCheck, CheckCircle, XCircle } from 'lucide-react'
 import { useWorkflowRun } from '../hooks/useWorkflowRun'
 import { useSplitPane } from '../hooks/useSplitPane'
 import PipelinePanel from '../components/run/PipelinePanel'
@@ -112,6 +112,68 @@ const WorkflowRun: React.FC = () => {
           {state.stepMode ? <><SkipForward size={11} /> Step Mode</> : <><Play size={11} fill="currentColor" /> Auto</>}
         </button>
       </motion.div>
+
+      {/* HITL Approval Banner */}
+      <AnimatePresence>
+        {state.pendingApproval && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -8, height: 0 }}
+            style={{
+              marginBottom: '0.875rem',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.06))',
+              border: '1.5px solid rgba(245,158,11,0.4)',
+              padding: '0.875rem 1.125rem',
+              display: 'flex', alignItems: 'center', gap: '0.875rem',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              background: 'rgba(245,158,11,0.15)', border: '1.5px solid rgba(245,158,11,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <ShieldCheck size={18} color="#F59E0B" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: '0.82rem', fontWeight: '700', color: '#F59E0B', margin: '0 0 0.2rem' }}>
+                Human Review Required
+              </p>
+              <p style={{ fontSize: '0.68rem', color: 'rgba(245,158,11,0.7)', margin: 0, fontFamily: 'JetBrains Mono' }}>
+                Paused before: <span style={{ color: '#F59E0B' }}>{state.pendingApproval.nodeId}</span>
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+              <button
+                onClick={state.rejectStep}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.45rem 0.875rem', borderRadius: 8,
+                  fontSize: '0.72rem', fontWeight: '700',
+                  background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)',
+                  color: '#EF4444', cursor: 'pointer', transition: 'all 0.15s',
+                }}
+              >
+                <XCircle size={12} /> Reject
+              </button>
+              <button
+                onClick={state.approveStep}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.45rem 0.875rem', borderRadius: 8,
+                  fontSize: '0.72rem', fontWeight: '700',
+                  background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.45)',
+                  color: '#F59E0B', cursor: 'pointer', transition: 'all 0.15s',
+                }}
+              >
+                <CheckCircle size={12} /> Approve & Continue
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div
         style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0, borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)' }}

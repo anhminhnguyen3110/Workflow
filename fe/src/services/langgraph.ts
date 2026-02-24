@@ -53,11 +53,29 @@ export const langgraphAPI = {
     assistantId: string,
     threadId: string,
     input: Record<string, unknown>,
+    interruptBefore?: string[],
   ): AsyncGenerator<{ event: string; data: any }> {
-    const stream = lgClient.runs.stream(threadId, assistantId, {
+    const opts: any = {
       input,
       streamMode: ['updates', 'values', 'debug'],
-    })
+    }
+    if (interruptBefore && interruptBefore.length > 0) {
+      opts.interruptBefore = interruptBefore
+    }
+    const stream = lgClient.runs.stream(threadId, assistantId, opts)
+    for await (const chunk of stream) {
+      yield { event: chunk.event, data: chunk.data }
+    }
+  },
+
+  async *resumeRun(
+    assistantId: string,
+    threadId: string,
+  ): AsyncGenerator<{ event: string; data: any }> {
+    const stream = lgClient.runs.stream(threadId, assistantId, {
+      input: null,
+      streamMode: ['updates', 'values', 'debug'],
+    } as any)
     for await (const chunk of stream) {
       yield { event: chunk.event, data: chunk.data }
     }

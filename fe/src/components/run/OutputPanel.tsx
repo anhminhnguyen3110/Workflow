@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle, XCircle, Activity, MousePointerClick } from 'lucide-react'
+import { CheckCircle, XCircle, Activity, MousePointerClick, RotateCcw } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { WorkflowRunState } from '../../hooks/useWorkflowRun'
 import StepDetail from './StepDetail'
 
@@ -10,6 +11,7 @@ interface Props {
 
 const OutputPanel: React.FC<Props> = ({ state }) => {
   const { steps, selectedStep, completed, error, globalState } = state
+  const navigate = useNavigate()
   const selected = steps.find(s => s.id === selectedStep)
   const failedSteps = steps.filter(s => s.status === 'error')
 
@@ -88,16 +90,28 @@ const OutputPanel: React.FC<Props> = ({ state }) => {
                 padding: '0.875rem 1rem', borderRadius: 12,
                 background: 'rgba(16,185,129,0.08)',
                 border: '1px solid rgba(16,185,129,0.3)',
-                display: 'flex', alignItems: 'center', gap: '0.625rem',
               }}
             >
-              <CheckCircle size={18} color="#10B981" />
-              <div>
-                <p style={{ fontSize: '0.82rem', fontWeight: '700', color: '#10B981', margin: '0 0 0.15rem' }}>Run Completed</p>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>
-                  {steps.filter(s => s.status === 'completed').length} of {steps.length} nodes executed
-                </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.75rem' }}>
+                <CheckCircle size={18} color="#10B981" />
+                <div>
+                  <p style={{ fontSize: '0.82rem', fontWeight: '700', color: '#10B981', margin: '0 0 0.15rem' }}>Run Completed</p>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>
+                    {steps.filter(s => s.status === 'completed').length} of {steps.length} nodes executed
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={() => navigate(state.workflowDetailPath)}
+                style={{
+                  width: '100%', padding: '0.5rem', borderRadius: 8, fontSize: '0.72rem', fontWeight: '700',
+                  background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)',
+                  color: '#10B981', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                }}
+              >
+                <RotateCcw size={11} /> Run Again
+              </button>
             </motion.div>
           )}
           {(error || failedSteps.length > 0) && (
@@ -142,6 +156,19 @@ const OutputPanel: React.FC<Props> = ({ state }) => {
                   ))}
                 </div>
               )}
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.25rem' }}>
+                <button
+                  onClick={() => navigate(state.workflowDetailPath)}
+                  style={{
+                    flex: 1, padding: '0.5rem', borderRadius: 8, fontSize: '0.72rem', fontWeight: '700',
+                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                    color: '#FCA5A5', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                  }}
+                >
+                  <RotateCcw size={11} /> Run Again
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

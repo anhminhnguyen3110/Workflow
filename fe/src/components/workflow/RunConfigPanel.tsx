@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Play, Loader2, FileJson, AlertTriangle, CheckCircle,
-  Upload, FileText, X, Settings,
+  Upload, FileText, X, Settings, Zap, ShieldCheck,
 } from 'lucide-react'
 import { langgraphAPI } from '../../services/langgraph'
 
@@ -19,6 +19,7 @@ const RunConfigPanel: React.FC<Props> = ({ workflowId, onRunStart }) => {
   const [dragging, setDragging] = useState(false)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hitlMode, setHitlMode] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const validateJson = (v: string): boolean => {
@@ -65,7 +66,7 @@ const RunConfigPanel: React.FC<Props> = ({ workflowId, onRunStart }) => {
         r.onerror = rej
         r.readAsText(txtFile)
       })
-      const fullInput = { ...input, file_content: fileContent, file_name: txtFile.name }
+      const fullInput = { ...input, file_content: fileContent, file_name: txtFile.name, ...(hitlMode ? { __hitl__: true } : {}) }
       try {
         const thread = await langgraphAPI.createThread()
         langgraphAPI.storeRunInput(thread.thread_id, fullInput)
@@ -147,6 +148,50 @@ const RunConfigPanel: React.FC<Props> = ({ workflowId, onRunStart }) => {
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
+
+        {/* Run Mode selector */}
+        <div>
+          <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.5rem' }}>
+            Run Mode
+          </label>
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            {[
+              { id: false, label: 'Auto', Icon: Zap, desc: 'No approvals needed' },
+              { id: true, label: 'Human Review', Icon: ShieldCheck, desc: 'Pause for approval' },
+            ].map(({ id, label, Icon, desc }) => (
+              <button
+                key={String(id)}
+                onClick={() => setHitlMode(id)}
+                style={{
+                  flex: 1, padding: '0.5rem 0.6rem', borderRadius: 9,
+                  fontSize: '0.7rem', fontWeight: '700',
+                  background: hitlMode === id
+                    ? id ? 'rgba(245,158,11,0.18)' : 'rgba(99,102,241,0.18)'
+                    : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${
+                    hitlMode === id
+                      ? id ? 'rgba(245,158,11,0.5)' : 'rgba(99,102,241,0.5)'
+                      : 'rgba(255,255,255,0.08)'
+                  }`,
+                  color: hitlMode === id
+                    ? id ? '#F59E0B' : '#818CF8'
+                    : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <Icon size={11} />
+                  {label}
+                </div>
+                <span style={{ fontSize: '0.6rem', fontWeight: '400', opacity: 0.7 }}>{desc}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
