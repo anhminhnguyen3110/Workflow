@@ -1,10 +1,36 @@
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Play, Loader2, FileJson, AlertTriangle, CheckCircle,
-  Upload, FileText, X, Settings, Zap, ShieldCheck,
+  Upload, FileText, X, Settings, Zap, ShieldCheck, RefreshCw,
 } from 'lucide-react'
 import { langgraphAPI } from '../../services/langgraph'
+
+// Fields always excluded (handled by file upload or purely internal)
+const SKIP_FIELDS = new Set(['messages', 'file_content', 'file_name'])
+
+function buildDefaultJson(schema: any): string {
+  if (!schema?.properties) return '{}'
+  const obj: Record<string, unknown> = {}
+  for (const [key, def] of Object.entries(schema.properties) as [string, any][]) {
+    if (SKIP_FIELDS.has(key)) continue
+    // Determine the effective type
+    let type = def.type as string | undefined
+    if (!type && def.anyOf) {
+      const nonNull = def.anyOf.find((t: any) => t.type && t.type !== 'null')
+      type = nonNull?.type
+    }
+    // Skip complex types
+    if (!type || type === 'array' || type === 'object') continue
+    // Skip runtime-only fields (integer/number unless they look like user inputs)
+    // We keep string fields and boolean; skip number/integer (they're usually runtime state)
+    if (type === 'integer' || type === 'number') continue
+    const isNullable = def.anyOf?.some((t: any) => t.type === 'null') ?? false
+    if (type === 'string') obj[key] = isNullable ? null : ''
+    if (type === 'boolean') obj[key] = false
+  }
+  return JSON.stringify(obj, null, 2)
+}
 
 interface Props {
   workflowId: string
@@ -12,7 +38,7 @@ interface Props {
 }
 
 const RunConfigPanel: React.FC<Props> = ({ workflowId, onRunStart }) => {
-  const [jsonInput, setJsonInput] = useState('{\n  "task": "analyze",\n  "priority": "high"\n}')
+  const [jsonInput, setJsonInput] = useState('')
   const [jsonError, setJsonError] = useState<string | null>(null)
   const [txtFile, setTxtFile] = useState<File | null>(null)
   const [txtPreview, setTxtPreview] = useState<string | null>(null)
@@ -20,7 +46,27 @@ const RunConfigPanel: React.FC<Props> = ({ workflowId, onRunStart }) => {
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hitlMode, setHitlMode] = useState(false)
+  const [schemaLoading, setSchemaLoading] = useState(false)
+  const [schemaTitle, setSchemaTitle] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const loadSchema = useCallback(async () => {
+    if (!workflowId) return
+    setSchemaLoading(true)
+    try {
+      const schemas = await langgraphAPI.getSchemas(workflowId)
+      const generated = buildDefaultJson(schemas.input_schema)
+      setJsonInput(generated)
+      setJsonError(null)
+      setSchemaTitle(schemas.input_schema?.title ?? null)
+    } catch {
+      // Fallback: keep current value
+    } finally {
+      setSchemaLoading(false)
+    }
+  }, [workflowId])
+
+  useEffect(() => { loadSchema() }, [loadSchema])
 
   const validateJson = (v: string): boolean => {
     try { JSON.parse(v); setJsonError(null); return true }
@@ -107,7 +153,15 @@ const RunConfigPanel: React.FC<Props> = ({ workflowId, onRunStart }) => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
             <label style={{ fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <FileJson size={12} color="var(--cyan)" /> Parameters
+              {schemaTitle && (
+                <span style={{
+                  fontSize: '0.58rem', padding: '0.1rem 0.4rem', borderRadius: 8,
+                  background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)',
+                  color: '#818CF8', fontFamily: 'JetBrains Mono', fontWeight: '600',
+                }}>{schemaTitle}</span>
+              )}
             </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <AnimatePresence>
               {!jsonError && jsonInput.trim() && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -117,22 +171,47 @@ const RunConfigPanel: React.FC<Props> = ({ workflowId, onRunStart }) => {
                 </motion.div>
               )}
             </AnimatePresence>
+            <button
+              onClick={loadSchema}
+              disabled={schemaLoading}
+              title="Regenerate from schema"
+              style={{
+                background: 'none', border: 'none', cursor: schemaLoading ? 'default' : 'pointer',
+                color: 'var(--text-muted)', display: 'flex', padding: '0.1rem', opacity: schemaLoading ? 0.4 : 0.7,
+              }}
+            >
+              <RefreshCw size={10} className={schemaLoading ? 'animate-spin' : ''} />
+            </button>
+            </div>
           </div>
-          <textarea
-            value={jsonInput}
-            onChange={e => handleJsonChange(e.target.value)}
-            spellCheck={false}
-            style={{
-              width: '100%', minHeight: '120px', padding: '0.7rem',
-              background: 'rgba(0,0,0,0.3)',
-              border: `1px solid ${jsonError ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)'}`,
-              borderRadius: 8, color: jsonError ? '#EF4444' : 'var(--cyan)',
-              fontFamily: 'JetBrains Mono, monospace', fontSize: '0.77rem', lineHeight: '1.7',
-              resize: 'vertical', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
-            }}
-            onFocus={e => e.target.style.borderColor = jsonError ? 'rgba(239,68,68,0.6)' : 'rgba(99,102,241,0.5)'}
-            onBlur={e => e.target.style.borderColor = jsonError ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)'}
-          />
+          <div style={{ position: 'relative' }}>
+            <textarea
+              value={schemaLoading ? '' : jsonInput}
+              onChange={e => handleJsonChange(e.target.value)}
+              disabled={schemaLoading}
+              spellCheck={false}
+              style={{
+                width: '100%', minHeight: '120px', padding: '0.7rem',
+                background: 'rgba(0,0,0,0.3)',
+                border: `1px solid ${jsonError ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 8, color: jsonError ? '#EF4444' : 'var(--cyan)',
+                fontFamily: 'JetBrains Mono, monospace', fontSize: '0.77rem', lineHeight: '1.7',
+                resize: 'vertical', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
+                opacity: schemaLoading ? 0.4 : 1,
+              }}
+              onFocus={e => e.target.style.borderColor = jsonError ? 'rgba(239,68,68,0.6)' : 'rgba(99,102,241,0.5)'}
+              onBlur={e => e.target.style.borderColor = jsonError ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.08)'}
+            />
+            {schemaLoading && (
+              <div style={{
+                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: '0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)', pointerEvents: 'none',
+              }}>
+                <Loader2 size={12} className="animate-spin" />
+                Loading schema…
+              </div>
+            )}
+          </div>
           <AnimatePresence>
             {jsonError && (
               <motion.div
