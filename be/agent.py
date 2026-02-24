@@ -157,12 +157,12 @@ def finalize(state: DocState) -> DocState:
 def create_graph():
     wf = StateGraph(DocState)
 
-    wf.add_node("load_document", load_document)
-    wf.add_node("validate_document", validate_document)
-    wf.add_node("handle_error", handle_error)
-    wf.add_node("extract_content", extract_content)
-    wf.add_node("summarize", summarize)
-    wf.add_node("finalize", finalize)
+    wf.add_node("load_document", load_document, metadata={"description": "Loads and reads the uploaded document content from file"})
+    wf.add_node("validate_document", validate_document, metadata={"description": "Validates document format, length and required fields"})
+    wf.add_node("handle_error", handle_error, metadata={"description": "Handles validation errors and formats error messages"})
+    wf.add_node("extract_content", extract_content, metadata={"description": "Extracts key sections and metadata from the document"})
+    wf.add_node("summarize", summarize, metadata={"description": "Generates a concise summary of the document content"})
+    wf.add_node("finalize", finalize, metadata={"description": "Finalizes the processing result and prepares the output"})
 
     wf.add_edge(START, "load_document")
     wf.add_edge("load_document", "validate_document")

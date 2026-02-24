@@ -168,12 +168,12 @@ def aggregate_output(state: ETLState) -> ETLState:
 def create_research_graph():
     wf = StateGraph(ETLState)
 
-    wf.add_node("ingest_data", ingest_data)
-    wf.add_node("clean_data", clean_data)
-    wf.add_node("quality_check", quality_check)
-    wf.add_node("flag_review", flag_review)
-    wf.add_node("enrich_data", enrich_data)
-    wf.add_node("aggregate_output", aggregate_output)
+    wf.add_node("ingest_data", ingest_data, metadata={"description": "Ingests and parses raw data from the uploaded source file"})
+    wf.add_node("clean_data", clean_data, metadata={"description": "Cleans and normalizes raw data — trims, deduplicates and type-casts"})
+    wf.add_node("quality_check", quality_check, metadata={"description": "Scores data quality and routes to enrich or flag-review paths"})
+    wf.add_node("flag_review", flag_review, metadata={"description": "Flags low-quality data records for manual review"})
+    wf.add_node("enrich_data", enrich_data, metadata={"description": "Enriches clean data with computed fields and external lookups"})
+    wf.add_node("aggregate_output", aggregate_output, metadata={"description": "Aggregates enriched records into the final output dataset"})
 
     wf.add_edge(START, "ingest_data")
     wf.add_edge("ingest_data", "clean_data")

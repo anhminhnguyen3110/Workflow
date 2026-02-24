@@ -30,6 +30,7 @@ export function useGraphInfo(workflowId: string | undefined): UseGraphInfoResult
             label: formatNodeLabel(n.data?.name ?? n.id),
             type: n.type,
             color: NODE_COLORS[i % NODE_COLORS.length],
+            description: n.data?.metadata?.description ?? undefined,
           }))
         const parsedEdges: GraphEdge[] = (graph.edges ?? [])
           .filter((e: any) => e.source !== '__start__' && e.target !== '__end__')

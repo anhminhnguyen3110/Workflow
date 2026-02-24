@@ -25,8 +25,7 @@ function buildDefaultJson(schema: any): string {
     // Skip runtime-only fields (integer/number unless they look like user inputs)
     // We keep string fields and boolean; skip number/integer (they're usually runtime state)
     if (type === 'integer' || type === 'number') continue
-    const isNullable = def.anyOf?.some((t: any) => t.type === 'null') ?? false
-    if (type === 'string') obj[key] = isNullable ? null : ''
+    if (type === 'string') obj[key] = ''
     if (type === 'boolean') obj[key] = false
   }
   return JSON.stringify(obj, null, 2)

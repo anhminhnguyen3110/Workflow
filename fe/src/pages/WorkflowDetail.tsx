@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Zap, Settings } from 'lucide-react'
+import { ArrowLeft, Zap } from 'lucide-react'
 import { langgraphAPI } from '../services/langgraph'
 import { useGraphInfo } from '../hooks/useGraphInfo'
 import { GraphNode } from '../types/graph'
@@ -9,14 +9,11 @@ import FlowCanvas from '../components/workflow/FlowCanvas'
 import NodeDetail from '../components/workflow/NodeDetail'
 import RunConfigPanel from '../components/workflow/RunConfigPanel'
 
-type RightPanel = 'config' | 'node'
-
 const WorkflowDetail: React.FC = () => {
   const { workflowId } = useParams<{ workflowId: string }>()
   const navigate = useNavigate()
   const [workflowName, setWorkflowName] = useState('')
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
-  const [rightPanel, setRightPanel] = useState<RightPanel>('config')
   const { nodes, edges, loading } = useGraphInfo(workflowId)
 
   useEffect(() => {
@@ -28,11 +25,6 @@ const WorkflowDetail: React.FC = () => {
       })
       .catch(() => setWorkflowName(workflowId!))
   }, [workflowId])
-
-  const handleNodeClick = (node: GraphNode | null) => {
-    setSelectedNode(node)
-    if (node) setRightPanel('node')
-  }
 
   const handleRunStart = (path: string) => {
     navigate(path)
@@ -85,46 +77,23 @@ const WorkflowDetail: React.FC = () => {
           edges={edges}
           loading={loading}
           selectedNode={selectedNode}
-          onSelectNode={handleNodeClick}
+          onSelectNode={setSelectedNode}
         />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', overflowY: 'auto', maxHeight: 560 }} className="custom-scrollbar">
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {([
-              { id: 'config' as RightPanel, label: 'Run Config', Icon: Settings },
-              { id: 'node' as RightPanel, label: 'Node Info', Icon: Zap },
-            ]).map(({ id, label, Icon }) => (
-              <button
-                key={id}
-                onClick={() => setRightPanel(id)}
-                style={{
-                  flex: 1, padding: '0.5rem', borderRadius: 9, fontSize: '0.72rem', fontWeight: '700',
-                  background: rightPanel === id ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${rightPanel === id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                  color: rightPanel === id ? '#818CF8' : 'var(--text-muted)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <Icon size={12} /> {label}
-              </button>
-            ))}
-          </div>
-
-          {rightPanel === 'config' && workflowId && (
+          {workflowId && (
             <RunConfigPanel workflowId={workflowId} onRunStart={handleRunStart} />
           )}
-          {rightPanel === 'node' && (
-            selectedNode
-              ? <NodeDetail node={selectedNode} allNodes={nodes} edges={edges} workflowId={workflowId!} onClose={() => setSelectedNode(null)} />
-              : <div style={{
-                  padding: '2rem 1rem', textAlign: 'center',
-                  border: '1.5px dashed rgba(255,255,255,0.08)', borderRadius: 14,
-                  color: 'var(--text-muted)', fontSize: '0.82rem',
-                }}>
-                  Click any node in the canvas to inspect it
-                </div>
-          )}
+          {selectedNode
+            ? <NodeDetail node={selectedNode} allNodes={nodes} edges={edges} workflowId={workflowId!} onClose={() => setSelectedNode(null)} />
+            : <div style={{
+                padding: '2rem 1rem', textAlign: 'center',
+                border: '1.5px dashed rgba(255,255,255,0.08)', borderRadius: 14,
+                color: 'var(--text-muted)', fontSize: '0.82rem',
+              }}>
+                Click any node in the canvas to inspect it
+              </div>
+          }
         </div>
       </div>
     </div>

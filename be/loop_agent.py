@@ -190,12 +190,12 @@ def finalize(state: ReviewState) -> ReviewState:
 
 
 builder = StateGraph(ReviewState)
-builder.add_node("extract", extract)
-builder.add_node("review", review)
-builder.add_node("refine", refine)
-builder.add_node("escalate", escalate)
-builder.add_node("format", format_output)
-builder.add_node("finalize", finalize)
+builder.add_node("extract", extract, metadata={"description": "Extracts raw text content from the uploaded file"})
+builder.add_node("review", review, metadata={"description": "Reviews content quality and assigns a score between 0 and 1"})
+builder.add_node("refine", refine, metadata={"description": "Refines content based on review feedback — may loop back to review"})
+builder.add_node("escalate", escalate, metadata={"description": "Escalates to human review after maximum retry attempts are reached"})
+builder.add_node("format", format_output, metadata={"description": "Formats approved content into the final output structure"})
+builder.add_node("finalize", finalize, metadata={"description": "Finalizes the content review pipeline and emits the result"})
 
 builder.add_edge(START, "extract")
 builder.add_edge("extract", "review")

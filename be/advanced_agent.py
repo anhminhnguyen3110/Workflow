@@ -185,11 +185,11 @@ def generate_invoice(state: OrderState) -> OrderState:
 def create_advanced_graph():
     wf = StateGraph(OrderState)
 
-    wf.add_node("parse_order", parse_order)
-    wf.add_node("risk_assessment", risk_assessment)
-    wf.add_node("manual_review", manual_review)
-    wf.add_node("auto_approve", auto_approve)
-    wf.add_node("generate_invoice", generate_invoice)
+    wf.add_node("parse_order", parse_order, metadata={"description": "Parses the uploaded order file and extracts line items and total value"})
+    wf.add_node("risk_assessment", risk_assessment, metadata={"description": "Scores order risk based on value, item count and priority flags"})
+    wf.add_node("manual_review", manual_review, metadata={"description": "Pauses for human review when risk score exceeds threshold (0.7)"})
+    wf.add_node("auto_approve", auto_approve, metadata={"description": "Auto-approves low-risk orders that fall below the risk threshold"})
+    wf.add_node("generate_invoice", generate_invoice, metadata={"description": "Generates the final invoice with 10% tax and approval status"})
 
     wf.add_edge(START, "parse_order")
     wf.add_edge("parse_order", "risk_assessment")

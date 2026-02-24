@@ -3,6 +3,7 @@ export interface GraphNode {
   label: string
   type?: string
   color: string
+  description?: string
 }
 
 export interface GraphEdge {
