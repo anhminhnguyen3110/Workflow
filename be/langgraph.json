@@ -1,0 +1,12 @@
+{
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "agent": "./agent.py:graph",
+    "advanced": "./advanced_agent.py:advanced_graph",
+    "research": "./research_agent.py:research_graph",
+    "loop": "./loop_agent.py:loop_graph"
+  },
+  "env": ".env"
+}

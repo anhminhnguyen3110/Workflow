@@ -1,0 +1,57 @@
+# ──────────────────────────────────────────
+# Python / Backend
+# ──────────────────────────────────────────
+be/venv/
+be/.venv/
+be/__pycache__/
+be/.env
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+
+# LangGraph cache / runtime
+.langgraph_api/
+be/.langgraph_api/
+*.db
+*.sqlite
+
+# ──────────────────────────────────────────
+# Node / Frontend
+# ──────────────────────────────────────────
+fe/node_modules/
+fe/build/
+fe/dist/
+fe/.env
+fe/.env.local
+fe/.env.development.local
+fe/.env.test.local
+fe/.env.production.local
+fe/npm-debug.log*
+fe/yarn-debug.log*
+fe/yarn-error.log*
+
+# ──────────────────────────────────────────
+# Screenshots / Test artifacts
+# ──────────────────────────────────────────
+.playwright-mcp/
+*.png
+*.jpg
+*.jpeg
+
+# ──────────────────────────────────────────
+# IDE / OS
+# ──────────────────────────────────────────
+.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ──────────────────────────────────────────
+# Misc
+# ──────────────────────────────────────────
+*.log
+*.tmp
+*.bak
