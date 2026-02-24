@@ -80,4 +80,14 @@ export const langgraphAPI = {
       yield { event: chunk.event, data: chunk.data }
     }
   },
+
+  async getSchemas(assistantId: string): Promise<{
+    input_schema: any
+    output_schema: any
+    state_schema: any
+  }> {
+    const res = await fetch(`http://localhost:8123/assistants/${assistantId}/schemas`)
+    if (!res.ok) throw new Error('Failed to fetch schemas')
+    return res.json()
+  },
 }

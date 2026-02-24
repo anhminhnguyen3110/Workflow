@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  X, Hash, Info, ChevronDown, ChevronRight, GitBranch, Cpu, Play,
+  X, Hash, Info, ChevronDown, ChevronRight, GitBranch, Cpu, LayoutList,
 } from 'lucide-react'
 import { GraphNode, GraphEdge } from '../../types/graph'
-import TestNodePanel from './TestNodePanel'
+import GraphSchemaPanel from './GraphSchemaPanel'
 
 interface Props {
   node: GraphNode
@@ -14,7 +14,7 @@ interface Props {
   onClose: () => void
 }
 
-type Tab = 'info' | 'test'
+type Tab = 'info' | 'schema'
 
 const NodeDetail: React.FC<Props> = ({ node, allNodes, edges, workflowId, onClose }) => {
   const [activeTab, setActiveTab] = useState<Tab>('info')
@@ -70,7 +70,7 @@ const NodeDetail: React.FC<Props> = ({ node, allNodes, edges, workflowId, onClos
       <div style={{ display: 'flex', gap: '0.2rem', padding: '0.5rem 0.875rem 0', background: 'rgba(0,0,0,0.2)' }}>
         {([
           { id: 'info' as Tab, label: 'Info', icon: <Info size={11} /> },
-          { id: 'test' as Tab, label: 'Test Node', icon: <Play size={11} /> },
+          { id: 'schema' as Tab, label: 'Schema', icon: <LayoutList size={11} /> },
         ]).map(t => (
           <button
             key={t.id}
@@ -147,10 +147,10 @@ const NodeDetail: React.FC<Props> = ({ node, allNodes, edges, workflowId, onClos
             )}
           </motion.div>
         ) : (
-          <TestNodePanel
-            key="test"
-            node={node}
+          <GraphSchemaPanel
+            key="schema"
             workflowId={workflowId}
+            accentColor={node.color}
           />
         )}
       </AnimatePresence>
